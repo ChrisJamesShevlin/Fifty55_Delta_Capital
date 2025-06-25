@@ -4,39 +4,34 @@ from tkinter import messagebox, font
 class PortfolioPositionSizerIGMargins:
     def __init__(self, root):
         self.root = root
-        root.title("Portfolio Position Sizer (IG Margin Rates)")
+        root.title("Twenty10 Delta Capital")
 
-        # Window & font
         root.geometry("800x650")
         root.minsize(600, 400)
         default_font = font.nametofont("TkDefaultFont")
         default_font.configure(size=12)
         root.option_add("*Font", default_font)
 
-        # Updated base stakes in £/point
         self.base_stakes = {
-            "US500 futures": 0.44,
-            "FTSE 100 futures": 0.29,
-            "Gold futures": 0.30,          # Increased from 0.29
+            "US500 futures": 0.34,
+            "Gold futures": 0.28,
             "EUR/USD futures": 0.15,
-            "Brent Crude futures": 0.15,
-            "Japan 225 futures": 0.04      # Reduced from 0.10
+            "Brent Crude futures": 0.08,
+            "Japan 225 futures": 0.04,  # Minimum viable
+            "EUR/JPY futures": 0.15
         }
 
-        # Default desired margin usage as % of balance
-        self.default_desired_margin_pct = 0.20  # 20%
+        self.default_desired_margin_pct = 0.20
 
-        # Hard-coded IG margin rates
         self.margin_rates = {
             "US500 futures": 0.05,
-            "FTSE 100 futures": 0.05,
             "Gold futures": 0.03,
             "EUR/USD futures": 0.0333,
             "Brent Crude futures": 0.05,
             "Japan 225 futures": 0.05,
+            "EUR/JPY futures": 0.0333
         }
 
-        # Build UI
         main = tk.Frame(root, padx=10, pady=10)
         main.pack(fill="both", expand=True)
 
@@ -53,9 +48,7 @@ class PortfolioPositionSizerIGMargins:
         self.entry_desired_margin.grid(row=row, column=1, sticky="we", padx=5, pady=5)
         row += 1
 
-        tk.Label(main, text="Current Prices (points) per instrument:").grid(
-            row=row, column=0, columnspan=2, pady=(10, 5)
-        )
+        tk.Label(main, text="Current Prices (points) per instrument:").grid(row=row, column=0, columnspan=2, pady=(10, 5))
         row += 1
 
         self.entries_price = {}
@@ -73,7 +66,6 @@ class PortfolioPositionSizerIGMargins:
         )
         row += 1
 
-        # Results area
         rf = tk.Frame(main, bd=1, relief="sunken")
         rf.grid(row=row, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
         main.grid_rowconfigure(row, weight=1)
@@ -87,7 +79,6 @@ class PortfolioPositionSizerIGMargins:
         self.txt.config(state="normal")
         self.txt.delete("1.0", tk.END)
 
-        # 1) Read balance
         try:
             bal = float(self.entry_balance.get())
             if bal <= 0:
@@ -96,7 +87,6 @@ class PortfolioPositionSizerIGMargins:
             messagebox.showerror("Input Error", "Enter a valid positive Account Balance.")
             return
 
-        # 2) Read desired margin %
         try:
             desired_pct = float(self.entry_desired_margin.get()) / 100.0
             if not (0 < desired_pct < 1):
@@ -106,7 +96,6 @@ class PortfolioPositionSizerIGMargins:
             messagebox.showerror("Input Error", "Enter a valid Desired Margin Usage % (e.g. 20).")
             return
 
-        # 3) Read prices
         prices = {}
         for instr in self.base_stakes:
             ent = self.entries_price[instr]
@@ -120,48 +109,60 @@ class PortfolioPositionSizerIGMargins:
                 self.txt.config(state="disabled")
                 return
 
-        # 4) Compute current margin use at base stakes
+        # Lock in Japan 225 stake at 0.04 and compute its margin
+        locked_stakes = {"Japan 225 futures": 0.04}
+        locked_margin = 0.04 * prices["Japan 225 futures"] * self.margin_rates["Japan 225 futures"]
+        remaining_margin = desired_margin - locked_margin
+
+        # Recalculate stakes for other instruments based on remaining margin
+        adjustable_instrs = [i for i in self.base_stakes if i != "Japan 225 futures"]
         current_margin_usage = 0.0
-        for instr, stake in self.base_stakes.items():
+        for instr in adjustable_instrs:
+            stake = self.base_stakes[instr]
             price = prices[instr]
             rate = self.margin_rates[instr]
             current_margin_usage += stake * price * rate
 
         if current_margin_usage <= 0:
-            messagebox.showerror("Calculation Error", "Computed zero or negative margin usage; check inputs.")
+            messagebox.showerror("Calculation Error", "Non-Japan stake configuration is invalid.")
             return
 
-        # 5) Scale factor to match desired margin
-        scale_factor = desired_margin / current_margin_usage
+        scale_factor = remaining_margin / current_margin_usage
+        final_stakes = locked_stakes.copy()
+        for instr in adjustable_instrs:
+            final_stakes[instr] = self.base_stakes[instr] * scale_factor
 
-        # 6) Final stakes
-        final_stakes = {instr: self.base_stakes[instr] * scale_factor for instr in self.base_stakes}
-
-        # 7) Display results
-        header = f"{'Instrument':25s} {'Price':>10s} {'Stake (£/pt)':>15s} {'Margin £':>12s}\n"
+        header = f"{'Instrument':25s} {'Price':>10s} {'Stake (£/pt)':>15s} {'Margin £':>12s} {'Weight %':>10s}\n"
         self.txt.insert(tk.END, header)
-        self.txt.insert(tk.END, "-" * 80 + "\n")
+        self.txt.insert(tk.END, "-" * 85 + "\n")
 
         total_margin = 0.0
+        margin_breakdown = {}
         for instr in self.base_stakes:
             p = prices[instr]
             stake = final_stakes[instr]
             rate = self.margin_rates[instr]
             margin_used = stake * p * rate
+            margin_breakdown[instr] = margin_used
             total_margin += margin_used
+
+        for instr in self.base_stakes:
+            p = prices[instr]
+            stake = final_stakes[instr]
+            margin_used = margin_breakdown[instr]
+            weight_pct = (margin_used / total_margin) * 100
             self.txt.insert(
                 tk.END,
-                f"{instr:25s} {p:10.2f} {stake:15.4f} {margin_used:12.2f}\n"
+                f"{instr:25s} {p:10.2f} {stake:15.4f} {margin_used:12.2f} {weight_pct:10.2f}\n"
             )
 
-        self.txt.insert(tk.END, "-" * 80 + "\n")
+        self.txt.insert(tk.END, "-" * 85 + "\n")
         self.txt.insert(
             tk.END,
             f"{'Total Margin Used':<50s}{total_margin:12.2f} (target {desired_margin:.2f})\n"
         )
 
         self.txt.config(state="disabled")
-
 
 if __name__ == "__main__":
     root = tk.Tk()
