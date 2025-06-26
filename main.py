@@ -19,26 +19,27 @@ class PortfolioPositionSizer:
         root.option_add("*Font", default_font)
 
         # ────────────────── Portfolio target weights (sum to 1) ──────────
+        # Adjusted FX to 5% each, reallocated +4% to US500 and +3% to Treasuries
         self.target_weights = {
-            "US500 futures":           0.28,
+            "US500 futures":           0.32,
             "Gold futures":            0.13,
-            "EUR/USD futures":         0.09,
-            "USD/JPY futures":         0.08,
+            "EUR/USD futures":         0.05,
+            "USD/JPY futures":         0.05,
             "Brent Crude futures":     0.05,
             "Japan 225 futures":       0.17,
-            "US Ultra Treasury Bond":  0.20,
+            "US Ultra Treasury Bond":  0.23,
         }
 
         # ──────────────── IG *retail-tier-1* margin rates ────────────────
         # Expressed as a fraction of notional value
         self.margin_rates = {
-            "US500 futures":           0.05,      # 5 %  ← reverted (0.6 £/pt ≈ £185 on 6200 pts)
-            "Gold futures":            0.05,      # 5 %
-            "EUR/USD futures":         0.0333,    # 3.33 %
-            "USD/JPY futures":         0.0333,    # 3.33 %
-            "Brent Crude futures":     0.10,      # 10 %
-            "Japan 225 futures":       0.05,      # 5 %
-            "US Ultra Treasury Bond":  0.0333,    # 3.33 %
+            "US500 futures":           0.05,
+            "Gold futures":            0.05,
+            "EUR/USD futures":         0.0333,
+            "USD/JPY futures":         0.0333,
+            "Brent Crude futures":     0.10,
+            "Japan 225 futures":       0.05,
+            "US Ultra Treasury Bond":  0.0333,
         }
 
         # Default share of equity you want on margin (editable by user)
@@ -96,7 +97,6 @@ class PortfolioPositionSizer:
         self.output.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.output.yview)
 
-    # ────────────────────────── Core logic ──────────────────────────────
     def calculate(self):
         """Validate inputs, compute stakes, and print the margin table."""
 
