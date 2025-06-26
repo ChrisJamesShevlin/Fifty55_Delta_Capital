@@ -12,23 +12,26 @@ class PortfolioPositionSizer:
         default_font.configure(size=12)
         root.option_add("*Font", default_font)
 
-        # Target allocation weights – revised, no bonds/cash
+        # Target allocation weights (must sum to 1.00)
         self.target_weights = {
-            "US500 futures": 0.30,
-            "Gold futures": 0.10,
-            "EUR/USD futures": 0.13,
-            "USD/JPY futures": 0.13,
-            "Brent Crude futures": 0.12,
-            "Japan 225 futures": 0.22
+            "US500 futures":           0.28,
+            "Gold futures":            0.13,
+            "EUR/USD futures":         0.09,
+            "USD/JPY futures":         0.08,
+            "Brent Crude futures":     0.05,
+            "Japan 225 futures":       0.17,
+            "US Ultra Treasury Bond":  0.20,
         }
 
+        # Margin rates as a fraction of notional
         self.margin_rates = {
-            "US500 futures": 0.05,
-            "Gold futures": 0.03,
-            "EUR/USD futures": 0.0333,
-            "USD/JPY futures": 0.05,
-            "Brent Crude futures": 0.05,
-            "Japan 225 futures": 0.05
+            "US500 futures":           0.05,
+            "Gold futures":            0.03,
+            "EUR/USD futures":         0.0333,
+            "USD/JPY futures":         0.05,
+            "Brent Crude futures":     0.05,
+            "Japan 225 futures":       0.05,
+            "US Ultra Treasury Bond":  0.0333,
         }
 
         self.default_margin_pct = 20
@@ -82,6 +85,7 @@ class PortfolioPositionSizer:
         self.output.config(state="normal")
         self.output.delete("1.0", tk.END)
 
+        # Validate account balance
         try:
             balance = float(self.entry_balance.get())
             if balance <= 0:
@@ -90,6 +94,7 @@ class PortfolioPositionSizer:
             messagebox.showerror("Input Error", "Enter a valid positive Account Balance.")
             return
 
+        # Validate margin percentage
         try:
             margin_pct = float(self.entry_margin_pct.get()) / 100
             if not (0 < margin_pct < 1):
@@ -99,6 +104,7 @@ class PortfolioPositionSizer:
             messagebox.showerror("Input Error", "Enter a valid Desired Margin Usage % (e.g. 20).")
             return
 
+        # Read current prices
         prices = {}
         for instr in self.target_weights:
             try:
@@ -110,13 +116,12 @@ class PortfolioPositionSizer:
                 messagebox.showerror("Input Error", f"Enter a valid price for '{instr}'.")
                 return
 
+        # Calculate stakes & margins per instrument
         stakes = {}
         margins = {}
-        for instr in self.target_weights:
-            weight = self.target_weights[instr]
+        for instr, weight in self.target_weights.items():
             price = prices[instr]
-            rate = self.margin_rates[instr]
-
+            rate  = self.margin_rates[instr]
             target_margin = target_total_margin * weight
             stake = target_margin / (price * rate)
             stakes[instr] = stake
@@ -124,10 +129,10 @@ class PortfolioPositionSizer:
 
         total_margin = sum(margins.values())
 
+        # Build output table
         header = f"{'Instrument':25s} {'Price':>10s} {'Stake (£/pt)':>15s} {'Margin £':>12s} {'Weight %':>10s}\n"
         self.output.insert(tk.END, header)
         self.output.insert(tk.END, "-" * 90 + "\n")
-
         for instr in self.target_weights:
             p = prices[instr]
             stake = stakes[instr]
