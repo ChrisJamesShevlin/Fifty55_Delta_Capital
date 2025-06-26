@@ -12,14 +12,14 @@ class PortfolioPositionSizer:
         default_font.configure(size=12)
         root.option_add("*Font", default_font)
 
-        # Target margin weights per instrument (must sum to 1.0)
+        # Target allocation weights – revised, no bonds/cash
         self.target_weights = {
-            "US500 futures": 0.23,
-            "Gold futures": 0.211,
-            "EUR/USD futures": 0.10,
-            "USD/JPY futures": 0.15,
-            "Brent Crude futures": 0.116,
-            "Japan 225 futures": 0.193
+            "US500 futures": 0.30,
+            "Gold futures": 0.10,
+            "EUR/USD futures": 0.13,
+            "USD/JPY futures": 0.13,
+            "Brent Crude futures": 0.12,
+            "Japan 225 futures": 0.22
         }
 
         self.margin_rates = {
@@ -120,7 +120,7 @@ class PortfolioPositionSizer:
             target_margin = target_total_margin * weight
             stake = target_margin / (price * rate)
             stakes[instr] = stake
-            margins[instr] = stake * price * rate  # Sanity check
+            margins[instr] = stake * price * rate
 
         total_margin = sum(margins.values())
 
@@ -144,7 +144,6 @@ class PortfolioPositionSizer:
             f"{'Total Margin Used':<50s}{total_margin:12.2f} (target {target_total_margin:.2f})\n"
         )
         self.output.config(state="disabled")
-
 
 if __name__ == "__main__":
     root = tk.Tk()
