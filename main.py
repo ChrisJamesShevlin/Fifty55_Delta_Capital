@@ -172,6 +172,6 @@ class PortfolioPositionSizer:
 
 
 if __name__ == '__main__':
-    root = tk.Tk()A
+    root = tk.Tk()
     app = PortfolioPositionSizer(root)
     root.mainloop()
