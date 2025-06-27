@@ -9,37 +9,36 @@ class PortfolioPositionSizer:
 
     def __init__(self, root: tk.Tk):
         self.root = root
-        root.title("Twenty10 Delta Capital")
-        root.geometry("800x650")
+        root.title('Twenty10 Delta Capital')
+        root.geometry('800x650')
         root.minsize(600, 400)
 
         # ────────────────────────── UI defaults ──────────────────────────
-        default_font = font.nametofont("TkDefaultFont")
+        default_font = font.nametofont('TkDefaultFont')
         default_font.configure(size=12)
-        root.option_add("*Font", default_font)
+        root.option_add('*Font', default_font)
 
         # ────────────────── Portfolio target weights (sum to 1) ──────────
-        # Adjusted FX to 5% each, reallocated +4% to US500 and +3% to Treasuries
+        # Compromise: equities ~52%, bonds ~24%, gold ~9%, oil ~5%, FX 10%
         self.target_weights = {
-            "US500 futures":           0.32,
-            "Gold futures":            0.13,
-            "EUR/USD futures":         0.05,
-            "USD/JPY futures":         0.05,
-            "Brent Crude futures":     0.05,
-            "Japan 225 futures":       0.17,
-            "US Ultra Treasury Bond":  0.23,
+            'US500 futures':           0.345,
+            'Gold futures':            0.090,
+            'EUR/USD futures':         0.050,
+            'USD/JPY futures':         0.050,
+            'Brent Crude futures':     0.050,
+            'Japan 225 futures':       0.175,
+            'US Ultra Treasury Bond':  0.240,
         }
 
         # ──────────────── IG *retail-tier-1* margin rates ────────────────
-        # Expressed as a fraction of notional value
         self.margin_rates = {
-            "US500 futures":           0.05,
-            "Gold futures":            0.05,
-            "EUR/USD futures":         0.0333,
-            "USD/JPY futures":         0.0333,
-            "Brent Crude futures":     0.10,
-            "Japan 225 futures":       0.05,
-            "US Ultra Treasury Bond":  0.0333,
+            'US500 futures':           0.05,
+            'Gold futures':            0.05,
+            'EUR/USD futures':         0.0333,
+            'USD/JPY futures':         0.0333,
+            'Brent Crude futures':     0.10,
+            'Japan 225 futures':       0.05,
+            'US Ultra Treasury Bond':  0.0333,
         }
 
         # Default share of equity you want on margin (editable by user)
@@ -47,61 +46,61 @@ class PortfolioPositionSizer:
 
         # ────────────────────────── Build UI ─────────────────────────────
         main = tk.Frame(root, padx=10, pady=10)
-        main.pack(fill="both", expand=True)
+        main.pack(fill='both', expand=True)
 
         row = 0
-        tk.Label(main, text="Account Balance (£):").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        tk.Label(main, text='Account Balance (£):').grid(row=row, column=0, sticky='e', padx=5, pady=5)
         self.entry_balance = tk.Entry(main)
-        self.entry_balance.grid(row=row, column=1, sticky="we", padx=5, pady=5)
+        self.entry_balance.grid(row=row, column=1, sticky='we', padx=5, pady=5)
         row += 1
 
-        tk.Label(main, text=f"Desired Margin Usage (% of balance, default {self.default_margin_pct}%):") \
-            .grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        tk.Label(main, text=f'Desired Margin Usage (% of balance, default {self.default_margin_pct}%):') \
+            .grid(row=row, column=0, sticky='e', padx=5, pady=5)
         self.entry_margin_pct = tk.Entry(main)
         self.entry_margin_pct.insert(0, str(self.default_margin_pct))
-        self.entry_margin_pct.grid(row=row, column=1, sticky="we", padx=5, pady=5)
+        self.entry_margin_pct.grid(row=row, column=1, sticky='we', padx=5, pady=5)
         row += 1
 
-        tk.Label(main, text="Current Prices (points) per instrument:").grid(row=row, column=0, columnspan=2, pady=(10, 5))
+        tk.Label(main, text='Current Prices (points) per instrument:').grid(row=row, column=0, columnspan=2, pady=(10, 5))
         row += 1
 
         self.price_entries = {}
         for instr in self.target_weights:
-            tk.Label(main, text=f"{instr} Price:").grid(row=row, column=0, sticky="e", padx=5, pady=3)
+            tk.Label(main, text=f'{instr} Price:').grid(row=row, column=0, sticky='e', padx=5, pady=3)
             entry = tk.Entry(main)
-            entry.grid(row=row, column=1, sticky="we", padx=5, pady=3)
+            entry.grid(row=row, column=1, sticky='we', padx=5, pady=3)
             self.price_entries[instr] = entry
             row += 1
 
         main.grid_columnconfigure(1, weight=1)
 
-        tk.Button(main, text="Calculate Stakes", command=self.calculate).grid(
+        tk.Button(main, text='Calculate Stakes', command=self.calculate).grid(
             row=row, column=0, columnspan=2, pady=10
         )
         row += 1
 
-        result_frame = tk.Frame(main, bd=1, relief="sunken")
-        result_frame.grid(row=row, column=0, columnspan=2, sticky="nsew", padx=5, pady=5)
+        result_frame = tk.Frame(main, bd=1, relief='sunken')
+        result_frame.grid(row=row, column=0, columnspan=2, sticky='nsew', padx=5, pady=5)
         main.grid_rowconfigure(row, weight=1)
 
-        scrollbar = tk.Scrollbar(result_frame, orient="vertical")
-        scrollbar.pack(side="right", fill="y")
+        scrollbar = tk.Scrollbar(result_frame, orient='vertical')
+        scrollbar.pack(side='right', fill='y')
 
         self.output = tk.Text(
             result_frame,
-            wrap="none",
+            wrap='none',
             yscrollcommand=scrollbar.set,
-            font=("Courier", 12),
-            bg="#f9f9f9",
+            font=('Courier', 12),
+            bg='#f9f9f9',
         )
-        self.output.pack(side="left", fill="both", expand=True)
+        self.output.pack(side='left', fill='both', expand=True)
         scrollbar.config(command=self.output.yview)
 
     def calculate(self):
         """Validate inputs, compute stakes, and print the margin table."""
 
-        self.output.config(state="normal")
-        self.output.delete("1.0", tk.END)
+        self.output.config(state='normal')
+        self.output.delete('1.0', tk.END)
 
         # 1️⃣ Account balance
         try:
@@ -109,7 +108,7 @@ class PortfolioPositionSizer:
             if balance <= 0:
                 raise ValueError
         except Exception:
-            messagebox.showerror("Input Error", "Enter a valid positive Account Balance.")
+            messagebox.showerror('Input Error', 'Enter a valid positive Account Balance.')
             return
 
         # 2️⃣ Desired % of equity to commit as margin
@@ -119,7 +118,7 @@ class PortfolioPositionSizer:
                 raise ValueError
             target_total_margin = balance * margin_pct
         except Exception:
-            messagebox.showerror("Input Error", "Enter a valid Desired Margin Usage % (e.g. 20).")
+            messagebox.showerror('Input Error', 'Enter a valid Desired Margin Usage % (e.g. 20).')
             return
 
         # 3️⃣ Current prices (points)
@@ -131,7 +130,7 @@ class PortfolioPositionSizer:
                     raise ValueError
                 prices[instr] = price
             except Exception:
-                messagebox.showerror("Input Error", f"Enter a valid price for '{instr}'.")
+                messagebox.showerror('Input Error', f'Enter a valid price for {instr}.')
                 return
 
         # 4️⃣ Compute stake (£/pt) needed to hit the target margin per leg
@@ -152,7 +151,7 @@ class PortfolioPositionSizer:
         # 5️⃣ Pretty-print results
         header = f"{'Instrument':25s} {'Price':>10s} {'Stake (£/pt)':>15s} {'Margin £':>12s} {'Weight %':>10s}\n"
         self.output.insert(tk.END, header)
-        self.output.insert(tk.END, "-" * 90 + "\n")
+        self.output.insert(tk.END, '-' * 90 + '\n')
 
         for instr in self.target_weights:
             p = prices[instr]
@@ -164,15 +163,15 @@ class PortfolioPositionSizer:
                 f"{instr:25s} {p:10.2f} {stake:15.4f} {margin_used:12.2f} {weight_pct:10.2f}\n",
             )
 
-        self.output.insert(tk.END, "-" * 90 + "\n")
+        self.output.insert(tk.END, '-' * 90 + '\n')
         self.output.insert(
             tk.END,
             f"{'Total Margin Used':<50s}{total_margin:12.2f} (target {target_total_margin:.2f})\n",
         )
-        self.output.config(state="disabled")
+        self.output.config(state='disabled')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     root = tk.Tk()
     app = PortfolioPositionSizer(root)
     root.mainloop()
