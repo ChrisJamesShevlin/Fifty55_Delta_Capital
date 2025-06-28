@@ -4,7 +4,7 @@ from tkinter import messagebox, font
 class PortfolioPositionSizerDynamic:
     def __init__(self, root):
         self.root = root
-        root.title('Portfolio Position Sizer')
+        root.title('25Ten Delta Capital')
         root.geometry('1200x650')
         default_font = font.nametofont('TkDefaultFont')
         default_font.configure(size=12)
