@@ -5,17 +5,20 @@ class PortfolioPositionSizerDynamic:
     def __init__(self, root):
         self.root = root
         root.title('25Ten Delta Capital')
-        root.geometry('1200x650')
+        root.geometry('1300x670')
         default_font = font.nametofont('TkDefaultFont')
         default_font.configure(size=12)
         root.option_add('*Font', default_font)
 
         self.rows = []
-        self.headers = ["Instrument", "Sector", "Live Price", "Min Stake", "Margin @ Min", "Weight (%)"]
+        self.headers = [
+            "Instrument", "Sector", "Live Price", "Min Stake", 
+            "Margin @ Min", "Notional @ Min", "Weight (%)"
+        ]
         self.dynamic_frame = tk.Frame(root)
         self.dynamic_frame.pack(fill='both', expand=True, padx=10, pady=10)
 
-        # Account controls
+        # Account controls (no Total Portfolio Notional box)
         control_frame = tk.Frame(self.dynamic_frame)
         control_frame.pack(anchor='w')
         tk.Label(control_frame, text="Account Balance (£):").pack(side='left')
@@ -36,14 +39,14 @@ class PortfolioPositionSizerDynamic:
         tk.Label(self.table_frame, text='', width=6).grid(row=0, column=len(self.headers)) # for delete button
 
         # Add starter rows (Instrument and Sector ONLY, all else blank)
-        self.add_row(["US 500 cash DFB", "Equity", "", "", "", ""])
-        self.add_row(["Japan 225", "Equity", "", "", "", ""])
-        self.add_row(["UK Long-Gilt mini", "Bond", "", "", "", ""])
-        self.add_row(["Gold", "Commodity", "", "", "", ""])
-        self.add_row(["WTI Crude cash DFB", "Commodity", "", "", "", ""])
+        self.add_row(["US 500 cash DFB", "Equity", "", "", "", "", ""])
+        self.add_row(["Japan 225", "Equity", "", "", "", "", ""])
+        self.add_row(["UK Long-Gilt mini", "Bond", "", "", "", "", ""])
+        self.add_row(["Gold", "Commodity", "", "", "", "", ""])
+        self.add_row(["WTI Crude cash DFB", "Commodity", "", "", "", "", ""])
 
         # Output area
-        self.output = tk.Text(self.dynamic_frame, height=14, font=('Courier', 12), bg='#f9f9f9', state='disabled')
+        self.output = tk.Text(self.dynamic_frame, height=16, font=('Courier', 12), bg='#f9f9f9', state='disabled')
         self.output.pack(fill='both', expand=True, pady=(10,0))
 
     def add_row(self, values=None):
@@ -84,6 +87,7 @@ class PortfolioPositionSizerDynamic:
         except Exception:
             messagebox.showerror('Input Error', 'Enter a valid positive Account Balance.')
             return
+
         try:
             margin_pct = float(self.entry_margin_pct.get()) / 100
             if not (0 < margin_pct < 1):
@@ -95,7 +99,7 @@ class PortfolioPositionSizerDynamic:
 
         # Read instrument rows
         instruments = []
-        sum_weights = 0
+        weights = []
         for entries, _ in self.rows:
             try:
                 name = entries[0].get().strip()
@@ -103,52 +107,113 @@ class PortfolioPositionSizerDynamic:
                 price = float(entries[2].get())
                 min_stake = float(entries[3].get())
                 margin_min = float(entries[4].get())
-                weight = float(entries[5].get()) / 100
-                if not name or not sector or price <= 0 or min_stake <= 0 or margin_min < 0 or weight < 0:
+                notional_min = float(entries[5].get())
+                weight = float(entries[6].get()) / 100
+                if not name or not sector or price <= 0 or min_stake <= 0 or margin_min < 0 or notional_min < 0 or weight < 0:
                     continue
-                instruments.append(dict(name=name, sector=sector, price=price, min_stake=min_stake, margin_min=margin_min, weight=weight))
-                sum_weights += weight
+                notional_per_unit = notional_min / min_stake
+                margin_per_unit = margin_min / min_stake
+                instruments.append(dict(
+                    name=name, sector=sector, price=price, min_stake=min_stake,
+                    margin_min=margin_min, notional_min=notional_min, weight=weight,
+                    notional_per_unit=notional_per_unit, margin_per_unit=margin_per_unit
+                ))
+                weights.append(weight)
             except Exception:
                 continue
-        if not instruments or sum_weights == 0:
+        if not instruments or sum(weights) == 0:
             messagebox.showerror('Input Error', 'Please enter at least one valid instrument with positive weights.')
             return
 
-        # Calculate stakes and margins
-        stakes, margins, notionals = {}, {}, {}
-        for inst in instruments:
-            target_margin = target_total_margin * (inst['weight'] / sum_weights)
-            margin_per_unit = inst['margin_min'] / inst['min_stake'] if inst['min_stake'] > 0 else 0
-            if margin_per_unit == 0:
-                stake = inst['min_stake']
-                margin = inst['margin_min']
+        # --- Begin notional-weighted allocation with scaling and minimums ---
+        n = len(instruments)
+        min_stakes = [inst['min_stake'] for inst in instruments]
+        notional_per_unit = [inst['notional_per_unit'] for inst in instruments]
+        margin_per_unit = [inst['margin_per_unit'] for inst in instruments]
+        weights = [inst['weight'] for inst in instruments]
+        names = [inst['name'] for inst in instruments]
+
+        # Iteratively solve for the max total_notional such that all assets that can be above minimum get as close as possible to their target notional share, and total margin is at or just below target_total_margin
+
+        # 1. Allocate notional by weight, enforce minimums, loop
+        # 2. After first pass, if margin used < target, scale up all assets (not below min) so margin is as close as possible to target
+
+        # Helper: Given total_notional, allocate by weights with minimums enforced
+        def allocate_notional(total_notional, weights, min_stakes, notional_per_unit):
+            n = len(weights)
+            stakes = [0.0] * n
+            remaining = set(range(n))
+            weights_left = weights[:]
+            total_weight_left = sum(weights_left)
+            notional_left = total_notional
+            # First, pre-allocate minimums if needed
+            while True:
+                changed = False
+                # Compute targets for remaining
+                for i in list(remaining):
+                    target = weights[i] / total_weight_left * notional_left if total_weight_left > 0 else 0
+                    stake = target / notional_per_unit[i] if notional_per_unit[i] > 0 else 0
+                    if stake < min_stakes[i]:
+                        stakes[i] = min_stakes[i]
+                        notional_fixed = min_stakes[i] * notional_per_unit[i]
+                        notional_left -= notional_fixed
+                        total_weight_left -= weights[i]
+                        remaining.remove(i)
+                        changed = True
+                if not changed:
+                    break
+            # Allocate to the rest
+            for i in remaining:
+                target = weights[i] / total_weight_left * notional_left if total_weight_left > 0 else 0
+                stakes[i] = target / notional_per_unit[i] if notional_per_unit[i] > 0 else 0
+            return stakes
+
+        # 1. Initial guess: allocate all at minimum, sum margin, if less than target, scale up
+        stakes = min_stakes[:]
+        margins = [stakes[i]*margin_per_unit[i] for i in range(n)]
+        total_margin = sum(margins)
+        total_notional = sum(stakes[i]*notional_per_unit[i] for i in range(n))
+
+        # 2. Max possible notional (without exceeding margin target)
+        # Use bisection to find total_notional so that after allocation, margin used is just at or under target
+        # Lower bound: sum of minimums. Upper bound: big value.
+        low = sum(min_stakes[i]*notional_per_unit[i] for i in range(n))
+        high = low * 1000  # Arbitrary large
+        best_stakes = min_stakes[:]
+        for _ in range(40):
+            mid = (low + high) / 2
+            test_stakes = allocate_notional(mid, weights, min_stakes, notional_per_unit)
+            test_margins = [test_stakes[i]*margin_per_unit[i] for i in range(n)]
+            test_margin_sum = sum(test_margins)
+            if test_margin_sum > target_total_margin + 1e-8:
+                high = mid
             else:
-                stake_ideal = target_margin / margin_per_unit
-                stake = max(inst['min_stake'], stake_ideal)
-                margin = stake * margin_per_unit
-            stakes[inst['name']] = stake
-            margins[inst['name']] = margin
-            notionals[inst['name']] = stake * inst['price']
+                best_stakes = test_stakes[:]
+                low = mid
+        # Now, try to scale up all (not below min) so margin used is as close as possible to target
+        margins = [best_stakes[i]*margin_per_unit[i] for i in range(n)]
+        total_margin = sum(margins)
+        if total_margin < target_total_margin - 1e-6:
+            scale = target_total_margin / total_margin if total_margin > 0 else 1.0
+            for i in range(n):
+                best_stakes[i] = max(min_stakes[i], best_stakes[i]*scale)
+        stakes = best_stakes
+        margins = [stakes[i]*margin_per_unit[i] for i in range(n)]
+        notionals = [stakes[i]*notional_per_unit[i] for i in range(n)]
+        total_margin = sum(margins)
+        total_notional = sum(notionals)
 
-        total_margin = sum(margins[n] for n in stakes)
-        total_notional = sum(notionals[n] for n in stakes)
-
-        # Output
-        header = f"{'Instrument':25s} {'Sector':10s} {'Price':>10s} {'Stake (£/pt)':>15s} {'Notional £':>13s} {'Margin £':>12s} {'Weight %':>10s}\n"
-        self.output.insert(tk.END, header)
+        # --- Output ---
+        self.output.insert(tk.END, f"{'Instrument':25s} {'Sector':10s} {'Price':>10s} {'Stake (£/pt)':>15s} {'Notional £':>13s} {'Margin £':>12s} {'Weight %':>10s}\n")
         self.output.insert(tk.END, '-' * 100 + '\n')
-        for inst in instruments:
-            n = inst['name']
-            s = inst['sector']
-            p = inst['price']
-            stake = stakes[n]
-            margin = margins[n]
-            notional = notionals[n]
-            w_pct = (margin/total_margin)*100 if total_margin else 0
-            self.output.insert(tk.END, f"{n:25s} {s:10s} {p:10.2f} {stake:15.4f} {notional:13.2f} {margin:12.2f} {w_pct:10.2f}\n")
+        for i, inst in enumerate(instruments):
+            w_pct = (notionals[i]/total_notional)*100 if total_notional else 0
+            self.output.insert(
+                tk.END, 
+                f"{inst['name']:25s} {inst['sector']:10s} {inst['price']:10.2f} {stakes[i]:15.4f} {notionals[i]:13.2f} {margins[i]:12.2f} {w_pct:10.2f}\n"
+            )
         self.output.insert(tk.END, '-' * 100 + '\n')
 
-        # --- ACTUAL MARGIN % ---
         actual_margin_pct = (total_margin / balance) * 100 if balance else 0
         self.output.insert(
             tk.END,
