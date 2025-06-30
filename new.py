@@ -35,9 +35,11 @@ class PortfolioPositionSizerDynamic:
             tk.Label(self.table_frame, text=header, borderwidth=1, relief='solid', width=16).grid(row=0, column=col)
         tk.Label(self.table_frame, text='', width=6).grid(row=0, column=len(self.headers)) # for delete button
 
-        # Add starter rows (blank inputs except instrument name and sector)
+        # Add starter rows (Instrument and Sector ONLY, all else blank)
         self.add_row(["US 500 cash DFB", "Equity", "", "", "", ""])
+        self.add_row(["Japan 225", "Equity", "", "", "", ""])
         self.add_row(["UK Long-Gilt mini", "Bond", "", "", "", ""])
+        self.add_row(["Gold", "Commodity", "", "", "", ""])
         self.add_row(["WTI Crude cash DFB", "Commodity", "", "", "", ""])
 
         # Output area
