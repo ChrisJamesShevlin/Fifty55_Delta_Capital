@@ -26,7 +26,7 @@ class PortfolioPositionSizerDynamic:
         self.entry_balance.pack(side='left', padx=(0,10))
         tk.Label(control_frame, text="Desired Margin Usage (%):").pack(side='left')
         self.entry_margin_pct = tk.Entry(control_frame, width=5)
-        self.entry_margin_pct.insert(0, "28")
+        # No pre-fill for margin percentage!
         self.entry_margin_pct.pack(side='left', padx=(0,10))
         tk.Button(control_frame, text="Add Instrument", command=self.add_row).pack(side='left')
         tk.Button(control_frame, text="Calculate Stakes", command=self.calculate).pack(side='left')
@@ -40,7 +40,7 @@ class PortfolioPositionSizerDynamic:
 
         # Add starter rows (Instrument and Sector ONLY, all else blank)
         self.add_row(["US 500", "Equity", "", "", "", "", ""])
-        self.add_row(["Japan 225", "Equity", "", "", "", "", ""])
+        # self.add_row(["Japan 225", "Equity", "", "", "", "", ""])  # Japan 225 removed
         self.add_row(["US Treasury Bond", "Bond", "", "", "", "", ""])
         self.add_row(["Gold", "Commodity", "", "", "", "", ""])
         self.add_row(["WTI Crude", "Commodity", "", "", "", "", ""])
