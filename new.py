@@ -43,7 +43,7 @@ class PortfolioPositionSizerDynamic:
         # self.add_row(["Japan 225", "Equity", "", "", "", "", ""])  # Japan 225 removed
         self.add_row(["US Treasury Bond", "Bond", "", "", "", "", ""])
         self.add_row(["Gold", "Commodity", "", "", "", "", ""])
-        self.add_row(["WTI Crude", "Commodity", "", "", "", "", ""])
+        self.add_row(["UK Gilts", "Bond", "", "", "", "", ""])
 
         # Output area
         self.output = tk.Text(self.dynamic_frame, height=16, font=('Courier', 12), bg='#f9f9f9', state='disabled')
